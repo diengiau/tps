@@ -1,7 +1,8 @@
 # Trade Policy Sensitivity (TPS)
 
 **Code Appendix** for _“Trade Policy Uncertainty and Global Stock Returns: Evidence from the 2016 US Presidential Election”_
-This version: 2024/11/29
+
+_This version: 2024/11/29_
 
 This is code appendix to construct and analyze the project. It required data from **data** folder. In the folder, we have these code files:
 
