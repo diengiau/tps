@@ -15,14 +15,14 @@ This is code appendix to construct and analyze the project. It required data fro
 
 **To analyze the Trump 2016 event study: using Stata programming**
 4.	main.do: run regressions to use Trump 2016 election as the event and analyze if firms with high TPS will have a more negative returns. This file will call and run several below tests:
--	 t1_bystats.do and t2_summary_stats.do: Summary Statistics and univariate t-tests by groups.
--	 t3_main.do: Main regressions
--	 t4_more_country_controls.do: Control for other policies
--		t5_longterm.do: Long-term performance to one year
--		t6_alter_CARs.do: Robustness for alternative CAR specification. It will run five t6sub files for five alternative specifications.
--		t7_alterTPS.do: Robustness for alternative TPS specification
--		t_excludeChina.do: Exclude China and only-China sample
--		t_positive_vs_negativeTPS.do: Positive versus negative TPS
--		t_no_beta_control.do: Other robustness checks
+-	t1_bystats.do and t2_summary_stats.do: Summary Statistics and univariate t-tests by groups.
+-	t3_main.do: Main regressions
+-	t4_more_country_controls.do: Control for other policies
+-	t5_longterm.do: Long-term performance to one year
+-	t6_alter_CARs.do: Robustness for alternative CAR specification. It will run five t6sub files for five alternative specifications.
+-	t7_alterTPS.do: Robustness for alternative TPS specification
+-	t_excludeChina.do: Exclude China and only-China sample
+-	t_positive_vs_negativeTPS.do: Positive versus negative TPS
+-	t_no_beta_control.do: Other robustness checks
 
 After running these codes, the results will be in **output** folder.
