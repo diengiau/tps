@@ -1,0 +1,377 @@
+---
+title: "CAR with domestic and US market returns"
+author: "Richard"
+format: pdf
+editor: visual
+---
+
+```{r}
+con = connectPostgreSql()
+
+source("../src/merge_final_data.R")
+
+
+library(tidyverse)
+library(broom)
+library(purrr)
+
+plm <- possibly(lm, NA)
+
+```
+
+## 1. Prepare data
+
+```{r}
+# International stock returns
+df_election <- readRDS("../data/election-events/df_event_with_mret.rds") %>% 
+  ungroup()
+
+Factors = haven::read_sas("E:/database/Factors/factors_daily.sas7bdat")
+Factors = Factors %>% 
+  select(date, rf)
+
+df_election = df_election %>% 
+  left_join(Factors, by=c("datadate"="date"))
+```
+
+Then, add US market returns:
+
+```{r}
+con = connectPostgreSql()
+us_mret <- tbl(con, "dsi") %>% 
+  select(DATE, vwretd) %>% 
+  collect()
+us_mret = us_mret %>% 
+  mutate(
+    usret = vwretd,
+    usret_lag1 = dplyr::lag(usret, 1),
+    usret_lag2 = dplyr::lag(usret, 2),
+    usret_lag3 = dplyr::lag(usret, 3),
+    usret_lead1 = dplyr::lead(usret, 1),
+    usret_lead2 = dplyr::lead(usret, 2),
+    usret_lead3 = dplyr::lead(usret, 3)
+  )
+us_mret$vwretd = NULL
+```
+
+Merge them together:
+
+```{r}
+df_election  = df_election %>% 
+  left_join(us_mret,
+            by=c("datadate"="DATE"))
+```
+
+## 2. Different models to calculate CAR
+
+### 2.1 Model 1: Dimson 1979
+
+```{r}
+  # fit model for each group and save it as data.frame --> around 25 mins
+fitmodel <- df_election %>%
+  filter(est_window == 1) %>% 
+  group_by(gvkey, iid) %>% 
+  do(tidy(plm(ret ~ mret + mret_lag1 + mret_lag2 + 
+                mret_lead1 + mret_lead2 + 
+                usret + usret_lag1 + usret_lag2 +
+                usret_lead1 + usret_lead2, data = .)))
+
+
+#saveRDS(fitmodel, "data/election-events/fitmodel_editor_ver.rds")
+#fitmodel <- readRDS("data/election-events/fitmodel_editor_ver.rds")
+```
+
+Now we want to merge the `fitmodel` back to the original `df_election` to get the fitted value and abnormal returns.
+
+First, change the fitmodel from long to wide data
+
+```{r}
+fitmodel_wide <- fitmodel %>% 
+  select(gvkey, iid, term, estimate) %>% 
+  tidyr::spread(term, estimate)
+
+# filter NA
+fitmodel_wide <- fitmodel_wide[,1:13]
+
+names(fitmodel_wide)[3:13] <- paste0("b_", names(fitmodel_wide)[3:13])
+
+names(fitmodel_wide)[3] <- "b_intercept"
+
+```
+
+Second, merge `fitmodel_wide` back to our data:
+
+```{r}
+df_AR <- df_election %>% 
+  filter(event_window == 1) %>% # Filter the event_window only
+  left_join(fitmodel_wide, by = c("gvkey", "iid"))
+
+## fitted value
+df_AR <- df_AR %>% 
+  mutate(fitted_ret = b_intercept + b_mret*mret +
+         b_mret_lag1*mret_lag1 + b_mret_lag2*mret_lag2 +
+         b_mret_lead1*mret_lead1 + b_mret_lead2*mret_lead2 +
+         b_usret*usret +
+         b_usret_lag1*usret_lag1 + b_usret_lag2*usret_lag2 +
+         b_usret_lead1*mret_lead1 + b_usret_lead2*usret_lead2
+           ) %>% 
+  mutate(AR = ret - fitted_ret)
+
+saveRDS(df_AR, "../data/election-events/editor/df_AR_marketmodel_editor_ver.rds")
+
+```
+
+Export data:
+
+```{r}
+df_AR = merge_final_data(car_data = "data/election-events/editor/df_AR_marketmodel_editor_ver.rds")
+
+foreign::write.dta(df_AR, "Project 1/Raw Data/df_election_editor_ver.dta") # For Editor: GB
+```
+
+### 2.2 Model 2: CAPM, no leads/lags
+
+```{r}
+plm <- possibly(lm, NA)
+
+# fit model for each group and save it as data.frame --> around 25 mins
+fitmodel <- df_election %>%
+  filter(est_window == 1) %>% 
+  group_by(gvkey, iid) %>% 
+  do(tidy(plm(ret ~ mret + usret, data = .)))
+
+# when get fitted coefficients
+fitmodel_wide <- fitmodel %>% 
+  select(gvkey, iid, term, estimate) %>% 
+  tidyr::spread(term, estimate)
+
+# filter NA
+fitmodel_wide <- fitmodel_wide[,1:5]
+names(fitmodel_wide)[3:5] <- paste0("b_", names(fitmodel_wide)[3:5])
+names(fitmodel_wide)[3] <- "b_intercept"
+
+# calculate abnormal returns
+df_AR <- df_election %>% 
+  filter(event_window == 1) %>% # Filter the event_window only
+  left_join(fitmodel_wide, by = c("gvkey", "iid"))
+
+## fitted value
+df_AR <- df_AR %>% 
+  mutate(fitted_ret = b_intercept + b_mret*mret + b_usret*usret) %>% 
+  mutate(AR = ret - fitted_ret)
+
+saveRDS(df_AR, "../data/election-events/editor/df_AR_capm_model_editor_ver.rds")
+
+```
+
+Merge and export data:
+
+```{r}
+df_AR = merge_final_data(car_data = "data/election-events/editor/df_AR_capm_model_editor_ver.rds")
+haven::write_dta(df_AR, "Project 1/Raw Data/df_election_capm_editor_version.dta")
+```
+
+### 2.3 Model 3: FF3 model
+
+Prepare global factors:
+
+```{r}
+Gfactors = read_csv("E:/database/Factors/global_daily.csv") %>% 
+  janitor::clean_names() %>% select(-x1, -index)
+RegionCode = read_csv("../data/region_code.csv")
+```
+
+Firm daily returns:
+
+```{r}
+df_election = df_election %>% 
+  inner_join(RegionCode, by="fic") %>% 
+  inner_join(Gfactors %>% select(-rf), by=c("ff_region", "datadate"="date"))
+```
+
+Fit FF3 model and get AR:
+
+```{r}
+# fit model for each group and save it as data.frame --> around 25 mins
+fitmodel <- df_election %>%
+  filter(est_window == 1) %>% 
+  group_by(gvkey, iid) %>% 
+  do(tidy(plm(ret ~ mret + usret + smb + hml, data = .))) %>% 
+  ungroup()
+
+fitmodel_wide <- fitmodel %>% 
+  select(gvkey, iid, term, estimate) %>% 
+  tidyr::spread(term, estimate)
+
+# filter NA
+fitmodel_wide <- fitmodel_wide[,1:7]
+names(fitmodel_wide)[3:7] <- paste0("b_", names(fitmodel_wide)[3:7])
+names(fitmodel_wide)[3] <- "b_intercept"
+
+# calculate abnormal returns
+df_AR <- df_election %>% 
+  filter(event_window == 1) %>% # Filter the event_window only
+  left_join(fitmodel_wide, by = c("gvkey", "iid"))
+
+## fitted value
+df_AR <- df_AR %>% 
+  mutate(fitted_ret = b_intercept + b_mret*mret + b_usret*usret + b_hml*hml + b_smb*smb) %>% 
+  mutate(AR = ret - fitted_ret)
+```
+
+Save this data:
+
+```{r}
+saveRDS(df_AR, "data/election-events/editor/df_AR_ff3_model_editor_ver.rds")
+```
+
+Merge final data:
+
+```{r}
+df_AR = merge_final_data(car_data = "data/election-events/editor/df_AR_ff3_model_editor_ver.rds")
+haven::write_dta(df_AR, "Project 1/Raw Data/df_election_ff3_editor_version.dta")
+```
+
+### 2.4 Model 1b: Dimson 1979, excess returns
+
+```{r}
+df_election = df_election %>% 
+  mutate(
+    ret = ret - rf,
+    mret = mret - rf,
+    usret = usret - rf
+  )
+```
+
+```{r}
+  # fit model for each group and save it as data.frame --> around 25 mins
+fitmodel <- df_election %>%
+  filter(est_window == 1) %>% 
+  group_by(gvkey, iid) %>% 
+  do(tidy(plm(ret ~ mret + mret_lag1 + mret_lag2 + 
+                mret_lead1 + mret_lead2 + 
+                usret + usret_lag1 + usret_lag2 +
+                usret_lead1 + usret_lead2, data = .)))
+
+
+fitmodel_wide <- fitmodel %>% 
+  select(gvkey, iid, term, estimate) %>% 
+  tidyr::spread(term, estimate)
+
+# filter NA
+fitmodel_wide <- fitmodel_wide[,1:13]
+names(fitmodel_wide)[3:13] <- paste0("b_", names(fitmodel_wide)[3:13])
+names(fitmodel_wide)[3] <- "b_intercept"
+
+```
+
+Second, merge `fitmodel_wide` back to our data:
+
+```{r}
+df_AR <- df_election %>% 
+  filter(event_window == 1) %>% # Filter the event_window only
+  left_join(fitmodel_wide, by = c("gvkey", "iid"))
+
+## fitted value
+df_AR <- df_AR %>% 
+  mutate(fitted_ret = b_intercept + b_mret*mret +
+         b_mret_lag1*mret_lag1 + b_mret_lag2*mret_lag2 +
+         b_mret_lead1*mret_lead1 + b_mret_lead2*mret_lead2 +
+         b_usret*usret +
+         b_usret_lag1*usret_lag1 + b_usret_lag2*usret_lag2 +
+         b_usret_lead1*mret_lead1 + b_usret_lead2*usret_lead2
+           ) %>% 
+  mutate(AR = ret - fitted_ret)
+
+saveRDS(df_AR, "../data/election-events/editor/df_AR_marketmodel_exret_editor_ver.rds")
+
+```
+
+Export data:
+
+```{r}
+df_AR = merge_final_data(car_data = "data/election-events/editor/df_AR_marketmodel_exret_editor_ver.rds")
+
+foreign::write.dta(df_AR, "Project 1/Raw Data/df_election_exret_editor_ver.dta") # For Editor: GB
+```
+
+### 2.5 Model 2b: CAPM, no leads/lags, with excess returns
+
+```{r}
+# fit model for each group and save it as data.frame --> around 25 mins
+fitmodel <- df_election %>%
+  filter(est_window == 1) %>% 
+  group_by(gvkey, iid) %>% 
+  do(tidy(plm(ret ~ mret + usret, data = .)))
+
+# when get fitted coefficients
+fitmodel_wide <- fitmodel %>% 
+  select(gvkey, iid, term, estimate) %>% 
+  tidyr::spread(term, estimate)
+
+# filter NA
+fitmodel_wide <- fitmodel_wide[,1:5]
+names(fitmodel_wide)[3:5] <- paste0("b_", names(fitmodel_wide)[3:5])
+names(fitmodel_wide)[3] <- "b_intercept"
+
+# calculate abnormal returns
+df_AR <- df_election %>% 
+  filter(event_window == 1) %>% # Filter the event_window only
+  left_join(fitmodel_wide, by = c("gvkey", "iid"))
+
+## fitted value
+df_AR <- df_AR %>% 
+  mutate(fitted_ret = b_intercept + b_mret*mret + b_usret*usret) %>% 
+  mutate(AR = ret - fitted_ret)
+
+saveRDS(df_AR, "../data/election-events/editor/df_AR_capm_model_exret_editor_ver.rds")
+
+```
+
+Merge and export data:
+
+```{r}
+df_AR = merge_final_data(car_data = "data/election-events/editor/df_AR_capm_model_exret_editor_ver.rds")
+haven::write_dta(df_AR, "Project 1/Raw Data/df_election_capm_exret_editor_version.dta")
+```
+
+### 2.6 Model 3b: FF3 model with excess returns
+
+Fit FF3 model and get AR:
+
+```{r}
+# fit model for each group and save it as data.frame --> around 25 mins
+fitmodel <- df_election %>%
+  filter(est_window == 1) %>% 
+  group_by(gvkey, iid) %>% 
+  do(tidy(plm(ret ~ mret + usret + smb + hml, data = .))) %>% 
+  ungroup()
+
+fitmodel_wide <- fitmodel %>% 
+  select(gvkey, iid, term, estimate) %>% 
+  tidyr::spread(term, estimate)
+
+# filter NA
+fitmodel_wide <- fitmodel_wide[,1:7]
+names(fitmodel_wide)[3:7] <- paste0("b_", names(fitmodel_wide)[3:7])
+names(fitmodel_wide)[3] <- "b_intercept"
+
+# calculate abnormal returns
+df_AR <- df_election %>% 
+  filter(event_window == 1) %>% # Filter the event_window only
+  left_join(fitmodel_wide, by = c("gvkey", "iid"))
+
+## fitted value
+df_AR <- df_AR %>% 
+  mutate(fitted_ret = b_intercept + b_mret*mret + b_usret*usret + b_hml*hml + b_smb*smb) %>% 
+  mutate(AR = ret - fitted_ret)
+
+saveRDS(df_AR, "../data/election-events/editor/df_AR_ff3_model_exret_editor_ver.rds")
+```
+
+Merge final data:
+
+```{r}
+df_AR = merge_final_data(car_data = "data/election-events/editor/df_AR_ff3_model_exret_editor_ver.rds")
+haven::write_dta(df_AR, "Project 1/Raw Data/df_election_ff3_exret_editor_version.dta")
+```

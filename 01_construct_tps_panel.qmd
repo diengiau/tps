@@ -1,0 +1,674 @@
+---
+title: "01_Construct TPS"
+author: "Richard"
+format: html
+editor: visual
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(lubridate)
+
+# set workding directory
+setwd("D:/research/p15_trump/Project 1/Final Codes")
+```
+
+## 1. Rolling-window to get panel data of PUS
+
+### 1.1 Construction measures
+
+If we want a panel data of PUS, we can run rolling regression of the model. In particular, we use the data in the past ten years (t-10 to t-1) to estimate the PUS in year t. In this regard, we have a firm-year level data of PUS.
+
+**First**, we must prepare a dataframe `df_btf`. Then for each year, we filter the past ten years then apply the calculation to get the `coef_btf` as in section 1.1. As robustness checks, we also use alternative windows such as 3-year, 5-year.
+
+We also need the ME (market capitalization) of all the firms to get the value-weighted measures of country-level PUS.
+
+Let's prepare the data
+
+```{r}
+# ----------------
+# 1. BTF data: Import-Export data
+btf <- readxl::read_excel("../../data/stockdata/BTFs_0329.xlsx",
+                  col_types = c("numeric", "numeric", "blank",
+                                "text", "numeric", "numeric"))
+btf <- btf %>% 
+  mutate(btf = log(imp + exp),
+         imex = imp + exp
+  ) %>% 
+  group_by(fic) %>% 
+  arrange(fic, year, month) %>% 
+  mutate(
+    # r_btf = 100*(imex - lag(imex))/lag(imex),
+    r_btf = 100*(log(imex/lag(imex))),
+    r_imp = 100*(imp - lag(imp))/lag(imp),
+    r_exp = 100*(exp - lag(exp))/lag(exp),
+  ) %>% 
+  ungroup()
+
+btf = btf %>% 
+  filter(year %in% 1990:2017)
+
+# ----------------
+# 2. canada firm returns
+library(readr)
+df_can <- read_csv("../../data/stockdata-long/canadaprice19902017.csv", 
+    col_types = cols(datadate = col_date(format = "%Y%m%d")))
+
+df_can <- df_can %>% 
+  arrange(gvkey, iid, datadate) %>% 
+  group_by(gvkey, iid) %>% 
+  mutate(ret = (prccm - lag(prccm))/lag(prccm))
+
+df_can <- df_can %>% 
+  ungroup() %>% 
+  mutate(year = year(datadate), month = month(datadate), ME = prccm*cshom) %>% 
+  select(gvkey, iid, fic, year, month, ret, ME)
+
+# ----------------
+# 3. other countries firm returns: from daily to monthly
+df_other <- data.table::fread("../../data/stockdata-long/globalprice19902017.csv")
+
+df_other <- df_other %>% 
+  select(gvkey, iid, datadate,
+         prccd, cshoc, fic)
+
+df_other <- df_other %>% 
+  mutate(datadate = ymd(datadate)) %>% 
+  mutate(year = year(datadate),
+         month = month(datadate), 
+         day = day(datadate))
+df_other <- df_other %>% 
+  group_by(gvkey, iid, year, month) %>% 
+  filter(day == max(day, na.rm = TRUE)) # filter the last date per month
+
+df_other <- df_other %>% 
+  group_by(gvkey, iid) %>% 
+  mutate(ret = (prccd - lag(prccd))/lag(prccd)) %>% 
+  ungroup() %>% 
+  mutate(ME = prccd*cshoc)
+
+df_other <- df_other %>% 
+  select(gvkey, iid, fic, year, month, ret, ME)
+
+# ----------------
+# 4. Countries Market Returns
+key <- readr::read_csv("../../data/stockdata/Compustat Global_Index Prices.csv") %>% 
+  rename(gvkeyx = `Global Index Key - Index Monthly`) %>% 
+  select(gvkeyx, fic) %>% 
+  unique()
+
+df_market <- readr::read_csv("../../data/stockdata-long/global-index19902017.csv", 
+    col_types = cols(datadate = col_date(format = "%Y%m%d")))
+
+df_market <- df_market %>% 
+  semi_join(key, by = c("gvkeyx")) %>% 
+  left_join(key, by = c("gvkeyx"))
+
+df_market <- df_market %>% 
+  mutate(year = year(datadate), month = month(datadate)) %>% 
+  arrange(gvkeyx, year, month) %>% 
+  group_by(gvkeyx) %>% 
+  mutate(mret = (prccm - lag(prccm))/lag(prccm)) %>% 
+  ungroup() %>% 
+  select(fic, year, month, mret)
+
+df_market = df_market %>% 
+  filter(year %in% 1990:2017)
+
+# ----------------
+# 5. US market index return: CRSP value-weighted
+us_mret <- readr::read_csv("../../data/stockdata-long/crsp-mret.csv") %>% 
+  rename(date = DATE) %>% 
+  mutate(date = ymd(date)) %>% 
+  mutate(year = year(date),
+         month = month(date)) %>% 
+  filter(year %in% 1990:2017) %>% 
+  select(-date)
+```
+
+Merge all together:
+
+```{r}
+# remove duplicates if any
+df_market <- df_market[!duplicated(df_market[,c("fic", "year", "month")]), ]
+btf <- btf[!duplicated(btf[,c("fic", "year", "month")]), ]
+
+df_can$gvkey <- as.integer(df_can$gvkey)
+df_firm = bind_rows(df_other, df_can)
+
+# MERGING
+df_btf <- left_join(df_firm, df_market, by = c("fic", "year", "month"))
+df_btf <- left_join(df_btf, btf, by = c("fic", "year", "month"))
+df_btf <- left_join(df_btf, us_mret, by = c("year", "month"))
+```
+
+Other BTF measures such as HP-filtered or AR(1):
+
+```{r}
+# save and re-import 
+btf2 = readRDS("../../data/all_btf.rds")
+
+btf2 <- btf[!duplicated(btf[,c("fic", "year", "month")]), ]
+df_btf2 <- left_join(df_btf, 
+                     btf2 %>% select(fic, year, month, r_btf_hp:ms_ar1), 
+                     by = c("fic", "year", "month"))
+
+```
+
+**Second**, write a function to rolling calculate the PUS for all the firms.
+
+#### Write a function to do so: `rolling_btf`
+
+```{r}
+# now we use fixed ME in year 2015
+# ME2015 <- readRDS("../data/stockdata/ME2015.rds")
+
+# begin the function
+rolling_rbtf <- function(df_btf, df_ME = NULL, year = 2011, pre = 5) {
+  # df_btf is a panel data of ret, mret of own country, vwretx of US CRSP
+  # if calculate for year 2011, we need data from 2006-2010 to filter
+  est_years = (year-pre):(year-1)
+  df <- filter(df_btf, year %in% est_years)
+  
+  # 1. fit the models
+  library(broom)
+  library(purrr)
+  plm <- possibly(lm, NA)
+  
+  # fit model for each group and save it as data.frame
+  cat(paste0("Fit model for year: ", year, "\n"))
+  fitmodel <- df %>%
+    group_by(gvkey, iid) %>% 
+    do(tidy(plm(ret ~ mret + r_btf + vwretx, data=.)))
+
+  # filter only the btf
+  pus <- fitmodel %>% 
+    filter(term == "r_btf") %>%
+    select(gvkey, iid, coef_btf = estimate)
+# Reviewer 1 wants to check correlation between TPS and US Beta
+  usbeta <- fitmodel %>% 
+    filter(term == "vwretx") %>% 
+    select(gvkey, iid, coef_usbeta = estimate) 
+ 
+  # 2. Get the PUS
+  # 2.1 Firm-level PUS
+  df_pus <- df %>% 
+    select(gvkey, iid, fic) %>% unique() %>% 
+    left_join(pus, by = c("gvkey", "iid")) %>% 
+    left_join(usbeta, by = c("gvkey", "iid"))
+  
+  # Remove all NaN and Inf
+  # df_pus <- df_pus %>% 
+  #   mutate(coef_btf = ifelse(is.nan(coef_btf), NA_real_, coef_btf),
+  #          coef_btf = ifelse(is.infinite(coef_btf), NA_real_, coef_btf))
+  df_pus <- df_pus %>% 
+    clean_df() %>% 
+    as_tibble()
+  
+  # 2.2 Equal-weighted PUS at country-level
+  # average across firms in one country
+  df_pus <- df_pus %>% 
+    group_by(fic) %>% 
+    mutate(pus_mean = mean(coef_btf, na.rm = T),
+           pus_med = median(coef_btf, na.rm = T)) %>% 
+    mutate(year = year) %>% 
+    ungroup()
+  
+  # 2.2 Value-weighted PUS at country-level
+  if (!is.null(df_ME)){
+    df_pus2 <- left_join(df_pus, df_ME, by = c("fic", "gvkey", "iid"))
+    
+    # value-weighted average across firms in one country
+    # because weighted.mean does not handle missing in weight vector so we need to replace any missing in ME by zero.
+    df_pus2 <- df_pus2 %>% 
+      mutate(ME = ifelse(is.na(ME), 0, ME))
+    
+    df_pus2 <- df_pus2 %>% 
+      group_by(fic) %>% 
+      mutate(pus_wmean = weighted.mean(x = coef_btf, 
+                                       w = ME, na.rm = TRUE)) %>% 
+    ungroup()
+    
+    # at country level
+    df_pus_country = df_pus2 %>% 
+      select(fic, pus_mean, pus_med, pus_wmean) %>% 
+      unique()
+    
+    df_pus_country <- df_pus_country %>% 
+      filter(!is.na(pus_mean)) %>% 
+      filter(!is.infinite(pus_mean)) %>% 
+      mutate(year = year)
+    return(list(df_pus, df_pus_country))
+  } else {
+    return(df_pus)
+    }
+
+}
+
+rolling_btf_imex <- function(df_btf, year = 2011, pre = 5) {
+  # df_btf is a panel data of ret, mret of own country, vwretx of US CRSP
+  # if calculate for year 2011, we need data from 2006-2010 to filter
+  est_years = (year-pre):(year-1)
+  df <- filter(df_btf, year %in% est_years)
+  
+  # 1. fit the models
+  library(broom)
+  library(purrr)
+  plm <- possibly(lm, NA)
+  
+  # 1. IMP and EXP  
+  # fit model for each group and save it as data.frame
+  cat(paste0("Fit model for year: ", year, "\n"))
+  fitmodel <- df %>%
+    group_by(gvkey, iid) %>%
+    do(tidy(plm(ret ~ mret + r_imp + vwretx, data=.))) %>% 
+    ungroup()
+
+  # filter only the r_imp
+  b_imp <- fitmodel %>%
+    filter(term == "r_imp") %>%
+    select(gvkey, iid, coef_r_imp = estimate)
+
+  fitmodel <- df %>%
+    group_by(gvkey, iid) %>%
+    do(tidy(plm(ret ~ mret + r_exp + vwretx, data=.))) %>% 
+    ungroup()
+
+  # filter only the r_imp
+  b_exp <- fitmodel %>%
+    filter(term == "r_exp") %>%
+    select(gvkey, iid, coef_r_exp = estimate)
+    
+  
+  # 2. Get the PUS
+  # 2.1 Firm-level PUS
+  df_pus <- df %>% 
+    select(gvkey, iid, fic) %>% 
+    unique() %>% 
+    mutate(year = year) %>% 
+    left_join(b_imp, by = c("gvkey", "iid")) %>%
+    left_join(b_exp, by = c("gvkey", "iid")) #%>%
+
+  df_pus <- df_pus %>% 
+    clean_df() %>% 
+    as_tibble()
+  
+
+    return(df_pus)
+}
+
+rolling_btf_hpar1 <- function(df_btf, year = 2011, pre = 5) {
+  # df_btf is a panel data of ret, mret of own country, vwretx of US CRSP
+  # if calculate for year 2011, we need data from 2006-2010 to filter
+  est_years = (year-pre):(year-1)
+  df <- filter(df_btf, year %in% est_years)
+  
+  # 1. fit the models
+  library(broom)
+  library(purrr)
+  plm <- possibly(lm, NA)
+  
+  # 1. IMP and EXP  
+  # fit model for each group and save it as data.frame
+  cat(paste0("Fit model for year: ", year, "\n"))
+  
+  # 2. HP
+  fitmodel <- df %>%
+    group_by(gvkey, iid) %>%
+    do(tidy(plm(ret ~ mret + r_btf_hp + vwretx + ms_hp
+                , data=.))) %>% 
+    ungroup()
+
+  b_hp <- fitmodel %>%
+    filter(term == "r_btf_hp") %>%
+    select(gvkey, iid, coef_btf_hp = estimate)
+
+  # 3. AR1
+  fitmodel <- df %>%
+    group_by(gvkey, iid) %>%
+    do(tidy(plm(ret ~ mret + r_btf_ar1 + vwretx + ms_ar1
+                , data=.))) %>% 
+    ungroup()
+
+  b_ar1 <- fitmodel %>%
+    filter(term == "r_btf_ar1") %>%
+    select(gvkey, iid, coef_btf_ar1 = estimate)
+    
+  
+  # 3. Get the PUS
+  # 3.1 Firm-level PUS
+  df_pus <- df %>% 
+    select(gvkey, iid, fic) %>% 
+    unique() %>% 
+    mutate(year = year) %>% 
+    left_join(b_hp, by = c("gvkey", "iid")) %>% 
+    left_join(b_ar1, by = c("gvkey", "iid"))
+  
+  # Remove all NaN and Inf
+  df_pus <- df_pus %>% 
+    clean_df() %>% 
+    as_tibble()
+
+  return(df_pus)
+}
+
+```
+
+Example for year 2011:
+
+```{r}
+df2011 <- suppressWarnings(rolling_rbtf(df_btf, year = 2011))
+
+df2011 <- suppressWarnings(rolling_btf_imex(df_btf, year = 2016))
+df2011 <- suppressWarnings(rolling_btf_hpar1(df_btf2, year = 2011))
+
+```
+
+Rolling using pre 5-years
+
+```{r}
+pre5 <- map(1995:2018, function(x)
+  suppressWarnings(rolling_rbtf(df_btf, year = x, pre = 5))
+  )
+df_pre5 <- pre5 %>% bind_rows()
+df_pre5 <- df_pre5 %>% 
+  select(gvkey, iid, year, fic, everything())
+names(df_pre5)[5:8] <- paste0(names(df_pre5)[5:8], "_pre5y")
+
+
+```
+
+Rolling using pre 1-years
+
+```{r}
+pre1 <- map(1995:2018, function(x)
+  suppressWarnings(rolling_rbtf(df_btf, year = x, pre = 1))
+  )
+df_pre1 <- pre1 %>% bind_rows()
+df_pre1 <- df_pre1 %>% 
+  select(gvkey, iid, year, fic, everything())
+names(df_pre1)[5:8] <- paste0(names(df_pre1)[5:8], "_pre1y")
+```
+
+Rolling using pre 2-years
+
+```{r}
+pre2 <- map(1995:2018, function(x)
+  suppressWarnings(rolling_rbtf(df_btf, year = x, pre = 2))
+  )
+df_pre2 <- pre2 %>% bind_rows()
+df_pre2 <- df_pre2 %>% 
+  select(gvkey, iid, year, fic, everything())
+names(df_pre2)[5:8] <- paste0(names(df_pre2)[5:8], "_pre2y")
+```
+
+Rolling using pre 3-years
+
+```{r}
+pre3 <- map(1995:2018, function(x)
+  suppressWarnings(rolling_rbtf(df_btf, year = x, pre = 3))
+  )
+df_pre3 <- pre3 %>% bind_rows()
+df_pre3 <- df_pre3 %>% 
+  select(gvkey, iid, year, fic, everything())
+names(df_pre3)[5:8] <- paste0(names(df_pre3)[5:8], "_pre3y")
+```
+
+Rolling using pre 4-years
+
+```{r}
+pre4 <- map(1995:2018, function(x)
+  suppressWarnings(rolling_rbtf(df_btf, year = x, pre = 4))
+  )
+df_pre4 <- pre4 %>% bind_rows()
+df_pre4 <- df_pre4 %>% 
+  select(gvkey, iid, year, fic, everything())
+names(df_pre4)[5:8] <- paste0(names(df_pre4)[5:8], "_pre4y")
+```
+
+Rolling using pre 10-years
+
+```{r}
+pre10 <- map(2000:2018, function(x)
+  suppressWarnings(rolling_rbtf(df_btf, year = x, pre = 10))
+  )
+df_pre10 <- pre10 %>% bind_rows()
+df_pre10 <- df_pre10 %>% 
+  select(gvkey, iid, year, fic, everything())
+names(df_pre10)[5:8] <- paste0(names(df_pre10)[5:8], "_pre10y")
+
+# Reviewer 1 wants to check correlation between TPS and US Beta
+df_pre10 %>% 
+  # mutate(year = year - 1) %>%
+  group_by(year) %>% 
+  mutate(
+    tps = datawizard::winsorize(abs(coef_btf_pre10y), 0.01),
+    usbeta = datawizard::winsorize(coef_usbeta_pre10y, 0.01)
+    # coef_btf = datawizard::winsorize(coef_btf_pre10y, 0.01),
+    # tps = datawizard::winsorize(abs(coef_btf_pre10y), 0.01),
+    # coef_usbeta = datawizard::winsorize(coef_usbeta_pre10y, 0.01),
+  ) %>% 
+  summarize(
+    corr = cor(tps, usbeta, use="complete.obs")
+  ) %>% 
+  ungroup() %>% 
+  as.data.frame() %>% 
+  kbl(digits = 4) %>% 
+  kable_minimal()
+
+df_pre10 %>% 
+  # mutate(year = year - 1) %>% 
+  group_by(year) %>% 
+  mutate(
+    coef_btf = datawizard::winsorize(coef_btf_pre10y, 0.01),
+    tps = datawizard::winsorize(abs(coef_btf_pre10y), 0.01),
+    coef_usbeta = datawizard::winsorize(coef_usbeta_pre10y, 0.01),
+  ) %>% 
+  summarize(
+    corr = cor(tps, coef_usbeta, use="complete.obs")
+  ) %>% 
+  ungroup() %>% #View()
+  ggplot(aes(x=year, y=corr)) + geom_line() + theme_bw() +
+  xlab("Year") + ylab("Correlation between TPS and US Beta")
+
+# alternative measures of BTF:
+pre10_imex <- map(2000:2018, function(x)
+  suppressWarnings(rolling_btf_imex(df_btf2, year = x, pre = 10))
+  ) %>% 
+  bind_rows() %>% 
+  select(gvkey, iid, year, fic, everything())
+names(pre10_imex)[5:6] <- paste0(names(pre10_imex)[5:6], "_pre10y") # NEED TO CHECK
+
+
+pre10_hpar1 <- map(2011:2018, function(x)
+  suppressWarnings(rolling_btf_hpar1(df_btf2, year = x, pre = 10))
+  ) %>% 
+  bind_rows() %>% 
+  select(gvkey, iid, year, fic, everything())
+names(pre10_hpar1)[5:6] <- paste0(names(pre10_hpar1)[5:6], "_pre10y")
+
+pre5_hpar1 <- map(2007:2018, function(x)
+  suppressWarnings(rolling_btf_hpar1(df_btf2, year = x, pre = 5))
+  ) %>% 
+  bind_rows() %>% 
+  select(gvkey, iid, year, fic, everything())
+names(pre5_hpar1)[5:6] <- paste0(names(pre5_hpar1)[5:6], "_pre5y")
+pre3_hpar1 <- map(2005:2018, function(x)
+  suppressWarnings(rolling_btf_hpar1(df_btf2, year = x, pre = 3))
+  ) %>% 
+  bind_rows() %>% 
+  select(gvkey, iid, year, fic, everything())
+names(pre3_hpar1)[5:6] <- paste0(names(pre3_hpar1)[5:6], "_pre3y")
+
+
+```
+
+Combine the PUS files
+
+```{r}
+df_pus <- df_pre1 %>% 
+  full_join(df_pre2, by=c("gvkey", "iid", "fic", "year")) %>%
+  full_join(df_pre3, by=c("gvkey", "iid", "fic", "year")) %>%
+  full_join(df_pre4, by=c("gvkey", "iid", "fic", "year")) %>% 
+  full_join(df_pre5, by=c("gvkey", "iid", "fic", "year")) %>% 
+  full_join(df_pre10, by=c("gvkey", "iid", "fic", "year"))
+
+saveRDS(df_pus, "data/construction/df_pus.rds")
+saveRDS(pre10_imex, "data/construction/pre10_imex.rds")
+saveRDS(pre10_hpar1, "data/construction/pre10_hpar1.rds")
+saveRDS(pre5_hpar1, "data/construction/pre5_hpar1.rds")
+saveRDS(pre3_hpar1, "data/construction/pre3_hpar1.rds")
+```
+
+### 1.2. Comparison with existing measures
+
+Required library:
+
+```{r}
+library(corrplot)
+library(kableExtra)
+```
+
+Draw a time-series plot:
+
+```{r}
+PusLong <- readRDS("data/construction/df_pus.rds")
+
+Pus_ts = PusLong %>% 
+  # mutate(across(coef_btf_pre1y:pus_med_pre5y, winsor), .by = c(year)) %>% 
+  # summarize(across(coef_btf_pre1y:pus_med_pre5y, mean), .by = c(gvkey, year)) %>% 
+  group_by(year) %>% 
+  summarize(
+    # TPS = median(pus_med_pre3y, na.rm=TRUE)*1000
+    TPS = mean(coef_btf_pre10y, na.rm=TRUE),
+    AbsTPS = abs(TPS)
+  ) %>% 
+  ungroup() %>% 
+  filter(year >= 2003) %>%  # filter sample period 2012-2017
+  mutate(year = year - 1)
+Pus_ts %>% 
+  ggplot(aes(x=year, y=AbsTPS)) + geom_line() + theme_bw() +
+  theme_classic(base_size = 14) +
+  xlab("Year") + ylab("Value") +
+  scale_x_continuous(breaks = 1990:2018) + 
+  ylab("TPS x 1,000")
+  
+```
+
+We need to find correlation with EPU and Hassan's Trade Risk: - Hassan's Trade Risk
+
+```{r}
+PRisk = readr::read_delim("data/validation/Prisk.txt", delim = "\t")
+
+PRiskTrade = PRisk %>% 
+  filter(hqcountrycode!="US") %>% 
+  mutate(year = as.integer(substr(date, 1, 4))) %>% 
+  group_by(year) %>% 
+  summarize(
+    PRiskT_trade = mean(PRiskT_trade, na.rm=TRUE),
+    PRiskT_economic = mean(PRiskT_economic, na.rm=TRUE),
+    PRiskT_tax = mean(PRiskT_tax, na.rm=TRUE),
+    PRisk = mean(PRisk, na.rm=TRUE),
+    NPRisk = mean(NPRisk, na.rm=TRUE),
+    Risk = mean(Risk, na.rm=TRUE),
+  ) %>% 
+  ungroup() %>% 
+  filter(year %in% Pus_ts$year) 
+
+PRiskTrade %>% 
+  ggplot(aes(x=year, y=PRiskT_economic)) + geom_line() + theme_bw()
+
+
+```
+
+-   Global EPU (Baker et al. 2016)
+
+```{r}
+GEpu_all = readxl::read_excel("data/validation/Global_Policy_Uncertainty_Data.xlsx") %>% janitor::clean_names()
+
+GEpu = GEpu_all %>% 
+  group_by(year) %>% 
+  summarize(
+    gepu_current = mean(gepu_current, na.rm=TRUE),
+    gepu_ppp = mean(gepu_ppp, na.rm=TRUE)
+  ) %>% 
+  ungroup() %>% 
+  filter(year %in% Pus_ts$year)  
+
+cor(Pus_ts %>% inner_join(GEpu, by="year"))
+```
+
+-   Make correlation matrix and plot:
+
+```{r}
+Pus_ts %>% 
+  inner_join(GEpu, by="year") %>% 
+  inner_join(PRiskTrade, by="year") %>% 
+  select(-year) %>% 
+  relocate(Risk, PRisk, NPRisk, .after = gepu_ppp) %>% as.data.frame() %>% 
+  mutate(across(everything(), scale)) %>%
+  cor() %>%
+  # correlation::correlation() %>% 
+  # sjPlot::sjp.corr(decimals = 2)
+  kbl(digits = 2) %>% 
+  kable_minimal()
+
+Pus_ts %>% 
+  inner_join(GEpu, by="year") %>% 
+  inner_join(PRiskTrade, by="year") %>% 
+  select(-year) %>% 
+  relocate(Risk, PRisk, NPRisk, .after = gepu_ppp) %>% as.data.frame() %>%
+  mutate(across(everything(), scale)) %>%
+  RStata::stata(
+  "
+  pwd
+  estpost corr *, matrix
+	esttab using output/TsCorrelation.rtf, not unstack compress noobs star(* 0.10 ** 0.05 *** 0.01) replace b(2)",
+	data.in = .
+  )
+
+Pus_ts %>% 
+  inner_join(GEpu, by="year") %>% 
+  inner_join(PRiskTrade, by="year") %>%
+  select(-year) %>%
+  cor() %>% 
+  corrplot(., type = "upper", order = "hclust", 
+         tl.col = "black", tl.srt = 45)
+```
+
+-   Make a time-series plot of TPS and competing index:
+
+```{r}
+Pus_ts %>% 
+  full_join(GEpu, by="year") %>% 
+  full_join(PRiskTrade, by="year") %>% 
+  select(year, TPS=AbsTPS, RawTPS=TPS, EPU=gepu_ppp, Political_Risk=PRisk) %>% 
+  mutate(
+    across(TPS:Political_Risk, scale)
+  ) %>% 
+  pivot_longer(-year, names_to = "index") %>% 
+  mutate(name=factor(index)) %>% 
+  ggplot(aes(x=year, y=value, linetype=index)) + 
+  geom_line(size=1) + 
+  theme_classic(base_size = 14) +
+  xlab("Year") + ylab("Value") +
+  scale_x_continuous(breaks = 1990:2018) + 
+  scale_linetype_manual(values=c("dashed", "dotdash", "dotted", "solid"))
+  # scale_linetype_manual(values=c("a", "f", "g", "e"))
+```
+
+For EPU only to motivate the paper:
+
+```{r}
+GEpu_all %>% 
+  group_by(year) %>% 
+  summarize(
+    gepu_ppp = mean(gepu_ppp, na.rm=TRUE)
+  ) %>% 
+  ungroup() %>% 
+  filter(year %in% 1997:2018) %>% 
+  ggplot(aes(x=year, y=gepu_ppp)) + geom_line() + theme_bw() +
+  scale_x_continuous(breaks = 1997:2018)
+```

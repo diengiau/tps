@@ -1,0 +1,161 @@
+---
+title: "construct_trump_regression_data"
+author: "Richard"
+format: html
+editor: visual
+---
+
+## Load library
+
+```{r}
+source("D:/research/p15_trump/src/merge_final_data.R")
+
+library(tidyverse)
+library(lubridate)
+library(haven)
+
+PusLong <- readRDS("data/construction/df_pus.rds")
+pre10_hpar1 = readRDS("data/construction/pre10_hpar1.rds")
+pre5_hpar1 = readRDS("data/construction/pre5_hpar1.rds")
+pre3_hpar1 = readRDS("data/construction/pre3_hpar1.rds")
+```
+
+## Prepare data
+
+**1 Main data: CAPM raw returns + RBTF**
+
+3-year TPS:
+
+```{r}
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = PusLong %>%
+    filter(year==2016) %>% 
+    select(gvkey, iid, fic, coef_btf = coef_btf_pre3y),
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/CAPM_RBTF3y.dta"
+  )
+```
+
+5-year TPS:
+
+```{r}
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = PusLong %>%
+    filter(year==2016) %>% 
+    select(gvkey, iid, fic, coef_btf = coef_btf_pre5y),
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/CAPM_RBTF5y.dta"
+  )
+
+```
+
+### 10-year rolling TPS:
+
+```{r}
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = df_pre10,
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/CAPM_RBTF10y.dta"
+  )
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_exret_editor_ver.rds",
+  pus_coef_data = df_pre10,
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/CAPMexret_RBTF10y.dta"
+  )
+
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_ff3_model_editor_ver.rds",
+  pus_coef_data = df_pre10,
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/FF3_RBTF10y.dta"
+  )
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_ff3_model_exret_editor_ver.rds",
+  pus_coef_data = df_pre10,
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/FF3exret_RBTF10y.dta"
+  )
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_marketmodel_editor_ver.rds",
+  pus_coef_data = df_pre10,
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/Dimson_RBTF10y.dta"
+  )
+merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_marketmodel_exret_editor_ver.rds",
+  pus_coef_data = df_pre10,
+  output_dir="D:/research/p15_trump/Project 1/Final Codes/data/trump/Dimsonexret_RBTF10y.dta"
+  )
+
+
+```
+
+### Alternative TPS
+
+
+
+```{r}
+# IMPORT EXPORT HP AR1
+CAPM_R_IMP10y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre10_imex,
+  pus_var_name = "coef_r_imp_pre10y"
+  )
+CAPM_R_EXP10y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre10_imex,
+  pus_var_name = "coef_r_exp_pre10y"
+  )
+CAPM_R_HP10y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre10_hpar1,
+  pus_var_name = "coef_btf_hp_pre10y"
+  )
+CAPM_R_AR10y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre10_hpar1,
+  pus_var_name = "coef_btf_ar1_pre10y"
+  )
+CAPM_R_HP5y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre5_hpar1,
+  pus_var_name = "coef_btf_hp_pre5y"
+  )
+CAPM_R_AR5y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre5_hpar1,
+  pus_var_name = "coef_btf_ar1_pre5y"
+  )
+CAPM_R_HP3y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre3_hpar1,
+  pus_var_name = "coef_btf_hp_pre3y"
+  )
+CAPM_R_AR3y = merge_final_data(
+  car_data = "D:/research/p15_trump/data/election-events/editor/df_AR_capm_model_editor_ver.rds",
+  pus_coef_data = pre3_hpar1,
+  pus_var_name = "coef_btf_ar1_pre3y"
+  )
+
+CAPM_R_IMP10y %>% 
+  rename(coef_r_imp = coef_btf) %>% 
+  left_join(CAPM_R_EXP10y %>% select(gvkey, iid, fic, dif, coef_r_exp=coef_btf) %>% 
+              distinct(gvkey, iid, fic, dif, .keep_all = TRUE),
+            by=c("gvkey", "iid", "fic", "dif")) %>% 
+  left_join(CAPM_R_HP10y %>% select(gvkey, iid, fic, dif, coef_btf_hp=coef_btf) %>% 
+              distinct(gvkey, iid, fic, dif, .keep_all = TRUE),
+            by=c("gvkey", "iid", "fic", "dif")) %>% 
+  left_join(CAPM_R_AR10y %>% select(gvkey, iid, fic,  dif, coef_btf_ar1=coef_btf) %>% 
+              distinct(gvkey, iid, fic, dif, .keep_all = TRUE),
+            by=c("gvkey", "iid", "fic", "dif")) %>% 
+  left_join(CAPM_R_HP5y %>% select(gvkey, iid, fic, dif, coef_btf_hp_5y=coef_btf) %>% 
+              distinct(gvkey, iid, fic, dif, .keep_all = TRUE),
+            by=c("gvkey", "iid", "fic", "dif")) %>% 
+  left_join(CAPM_R_AR5y %>% select(gvkey, iid, fic,  dif, coef_btf_ar1_5y=coef_btf) %>% 
+              distinct(gvkey, iid, fic, dif, .keep_all = TRUE),
+            by=c("gvkey", "iid", "fic", "dif")) %>% 
+  left_join(CAPM_R_HP3y %>% select(gvkey, iid, fic, dif, coef_btf_hp_3y=coef_btf) %>% 
+              distinct(gvkey, iid, fic, dif, .keep_all = TRUE),
+            by=c("gvkey", "iid", "fic", "dif")) %>% 
+  left_join(CAPM_R_AR3y %>% select(gvkey, iid, fic,  dif, coef_btf_ar1_3y=coef_btf) %>% 
+              distinct(gvkey, iid, fic, dif, .keep_all = TRUE),
+            by=c("gvkey", "iid", "fic", "dif")) %>% 
+  write_dta(., "D:/research/p15_trump/Project 1/Final Codes/data/trump/CAPM_AlterTPS.dta")
+```
