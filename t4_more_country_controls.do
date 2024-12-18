@@ -23,17 +23,17 @@ count
 global xvar lev roa beta log_asset bm cash
 est clear
 
-eststo: qui reg CAR_11 coef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp i.sic2 , r
-eststo: qui reg CAR_11 coef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate i.sic2 , r
-eststo: qui reg CAR_11 coef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment i.sic2 , r
-eststo: qui reg CAR_11 coef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment male_president new_president election party_orientation i.sic2 , r
-eststo: qui reg CAR_11 coef_btf lev roa beta log_asset bm cash immigration tax_rate renewable_energy_consumption kyoto_commitment import_us_gdp export_us_gdp election party_orientation male_president new_president i.sic2 , r
+eststo: qui reg CAR_11 coef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp i.sic2 , r
+eststo: qui reg CAR_11 coef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate i.sic2 , r
+eststo: qui reg CAR_11 coef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment i.sic2 , r
+eststo: qui reg CAR_11 coef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment male_president new_president election party_orientation i.sic2 , r
+eststo: qui reg CAR_11 coef_btf lev roa log_asset bm cash immigration tax_rate renewable_energy_consumption kyoto_commitment import_us_gdp export_us_gdp election party_orientation male_president new_president i.sic2 , r
 
-eststo: qui reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp i.sic2 , r
-eststo: qui reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate i.sic2 , r
-eststo: qui reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment i.sic2 , r
-eststo: qui reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment male_president new_president election party_orientation i.sic2 , r
-eststo: qui reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash immigration tax_rate renewable_energy_consumption kyoto_commitment import_us_gdp export_us_gdp election party_orientation male_president new_president i.sic2 , r
+eststo: qui reg CAR_11 ABScoef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp i.sic2 , r
+eststo: qui reg CAR_11 ABScoef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate i.sic2 , r
+eststo: qui reg CAR_11 ABScoef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment i.sic2 , r
+eststo: qui reg CAR_11 ABScoef_btf lev roa log_asset bm cash import_us_gdp export_us_gdp immigration tax_rate renewable_energy_consumption kyoto_commitment male_president new_president election party_orientation i.sic2 , r
+eststo: qui reg CAR_11 ABScoef_btf lev roa log_asset bm cash immigration tax_rate renewable_energy_consumption kyoto_commitment import_us_gdp export_us_gdp election party_orientation male_president new_president i.sic2 , r
 
 
 ***Output CAR_11 Results:

@@ -12,15 +12,15 @@ winsor2 r_*, cuts(1 99) replace
 
 * Regressions
 est clear
-eststo: reg r_21 coef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
-eststo: reg r_63 coef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
-eststo: reg r_126 coef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
-eststo: reg r_252 coef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
+eststo: reg r_21 coef_btf lev roa log_asset bm cash i.sic2 i.country, 
+eststo: reg r_63 coef_btf lev roa log_asset bm cash i.sic2 i.country, 
+eststo: reg r_126 coef_btf lev roa log_asset bm cash i.sic2 i.country, 
+eststo: reg r_252 coef_btf lev roa log_asset bm cash i.sic2 i.country, 
 
-eststo: reg r_21 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
-eststo: reg r_63 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
-eststo: reg r_126 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
-eststo: reg r_252 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country, 
+eststo: reg r_21 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country, 
+eststo: reg r_63 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country, 
+eststo: reg r_126 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country, 
+eststo: reg r_252 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country, 
 
 esttab * using "output/LongTermReturns.csv", replace modelwidth(10) varwidth(20) se ar2(4) ///
 b(4) label varlabels(_cons Constant) star(* 0.10 ** 0.05 *** 0.01) compress ///

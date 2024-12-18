@@ -5,7 +5,7 @@ run "t3_main.do"
 *********** Create variables for Table 2***********
 ***Panel A: Summary Statistics
 * Main variables
-asdoc su coef_btf ABScoef_btf CAR_11 CAR_33 CAR_55 CAR_5_1 CAR15 lev roa beta log_asset bm cash, stat(mean sd p25 p50 p75) replace dec(4) save(output/stat01.doc)
+asdoc su coef_btf ABScoef_btf CAR_11 CAR_33 CAR_55 CAR_5_1 CAR15 lev roa log_asset bm cash, stat(mean sd p25 p50 p75) replace dec(4) save(output/stat01.doc)
 * Other control variables: will be updated automatically after run t4 & t5 & t7 do files
 
 

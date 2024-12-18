@@ -92,14 +92,14 @@ gen ABScoef_btf_ar1_3y = abs(coef_btf_ar1_3y)
 winsor2 ABScoef_* , cuts(1 99) replace
 
 est clear
-eststo: quietly reg CAR_11 ABScoef_r_imp lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_r_exp lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf_hp lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf_ar1 lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf_hp_3y lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf_ar1_3y lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf_hp_5y lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf_ar1_5y lev roa beta log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_r_imp lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_r_exp lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf_hp lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf_ar1 lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf_hp_3y lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf_ar1_3y lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf_hp_5y lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf_ar1_5y lev roa log_asset bm cash i.sic2 i.country, r
 
 esttab using "output/AlternativeTPS.csv", replace modelwidth(10) varwidth(20) se ar2(4) ///
 b(4) label varlabels(_cons Constant) star(* 0.10 ** 0.05 *** 0.01) compress ///

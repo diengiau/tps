@@ -81,7 +81,7 @@ gen ABScoef_btf = abs(coef_btf)
 winsor2 ABScoef_btf, cuts(1 99) replace
 
 est clear
-eststo: quietly reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country, r
 esttab using "output/AltCARs.csv", append modelwidth(10) varwidth(20) se ar2(4) ///
 b(4) label varlabels(_cons Constant) star(* 0.10 ** 0.05 *** 0.01) compress ///
 drop(*sic2* *country*) ///

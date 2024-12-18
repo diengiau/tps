@@ -5,17 +5,17 @@ run "t3_main.do"
 
 * Positive vs Negative TPS
 est clear
-eststo: quietly reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country if coef_btf>0, r
-eststo: quietly reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country if coef_btf<0, r
-eststo: quietly reg CAR_11 coef_btf lev roa beta log_asset bm cash i.sic2 i.country if coef_btf>0, r
-eststo: quietly reg CAR_11 coef_btf lev roa beta log_asset bm cash i.sic2 i.country if coef_btf<0, r
+eststo: quietly reg CAR_11 coef_btf lev roa log_asset bm cash i.sic2 i.country if coef_btf>0, r
+eststo: quietly reg CAR_11 coef_btf lev roa log_asset bm cash i.sic2 i.country if coef_btf<0, r
+eststo: quietly reg CAR_11 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country if coef_btf>0, r
+eststo: quietly reg CAR_11 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country if coef_btf<0, r
 
 * Interaction with a dummy of positive TPS
 ge positiveTPS = 1 if coef_btf>0 & coef_btf!=.
 replace positiveTPS = 0 if coef_btf<0 & coef_btf!=.
 
-eststo: quietly reg CAR_11 c.ABScoef_btf##i.positiveTPS lev roa beta log_asset bm cash i.sic2 i.country, r
-eststo: quietly reg CAR_11 c.coef_btf##i.positiveTPS lev roa beta log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 c.coef_btf##i.positiveTPS lev roa log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 c.ABScoef_btf##i.positiveTPS lev roa log_asset bm cash i.sic2 i.country, r
 
 
 * export results

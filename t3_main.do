@@ -2,7 +2,6 @@ clear all
 *set matsize 1000
 
 **set working directory**
-*use "D:\research\p15_trump\Project 1\Raw Data\df_election_more_tps", clear
 use "D:/research/p15_trump/Project 1/Final Codes/data/trump/CAPM_RBTF10y.dta", clear
 
 format datadate %td
@@ -51,7 +50,7 @@ by gvkey: egen CAR_0=sum(AR_w) if event_window_0==1
 
 ******************3. Collapse data across observation before regressing*********
 collapse CAR_0 CAR_5_1 CAR_11 CAR_33 CAR_55 CAR15 sale_growth total_asset lev ///
-ME bm roa cash div beta LNMKTCAP log_asset ///
+ME bm roa beta cash div LNMKTCAP log_asset ///
 coef_* (firstnm) *_gdp sic fic country, by(gvkey)
 // (firstnm) sic fic country coef_*, by(gvkey)
 
@@ -71,11 +70,9 @@ order gvkey sic fic sic2 sic3
 
 
 
-********************4. Generating threat and beneficiary for CAR after Collapse*
-*replace coef_btf = coef_btf/1000
+********************4. Winsorize data*
 winsor2 CAR* , cuts(1 99) replace
 winsor2 lev roa beta log_asset bm cash, cuts (1 99) replace
-// winsor2 CAR* coef_btf lev roa beta log_asset bm cash, cuts (1 99) replace
 
 
 
@@ -86,12 +83,12 @@ winsor2 lev roa beta log_asset bm cash, cuts (1 99) replace
 est clear
 eststo: quietly reg CAR_11 coef_btf i.sic2 i.country, r
 eststo: quietly reg CAR_11 coef_btf lev i.sic2 i.country, r
-eststo: quietly reg CAR_11 coef_btf lev roa beta i.sic2 i.country, r
-eststo: quietly reg CAR_11 coef_btf lev roa beta log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 coef_btf lev roa i.sic2 i.country, r
+eststo: quietly reg CAR_11 coef_btf lev roa log_asset bm cash i.sic2 i.country, r
 
 
 ***Output CAR_11 Results:
-esttab using "output/Main.csv", replace modelwidth(10) varwidth(20) se ar2(4) ///
+esttab using "output/RawTPS.csv", replace modelwidth(10) varwidth(20) se ar2(4) ///
 b(4) label varlabels(_cons Constant) star(* 0.10 ** 0.05 *** 0.01) compress ///
 drop(*sic2* *country*) ///
 title({\b Table 5. } {Trump's policy effect on stock returns})
@@ -103,8 +100,8 @@ winsor2 ABScoef_btf, cuts(1 99) replace
 est clear
 eststo: quietly reg CAR_11 ABScoef_btf i.sic2 i.country, r
 eststo: quietly reg CAR_11 ABScoef_btf lev i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf lev roa beta i.sic2 i.country, r
-eststo: quietly reg CAR_11 ABScoef_btf lev roa beta log_asset bm cash i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf lev roa i.sic2 i.country, r
+eststo: quietly reg CAR_11 ABScoef_btf lev roa log_asset bm cash i.sic2 i.country, r
 esttab using "output/AbsTPS.csv", replace modelwidth(10) varwidth(20) se ar2(4) ///
 b(4) label varlabels(_cons Constant) star(* 0.10 ** 0.05 *** 0.01) compress ///
 drop(*sic2* *country*) ///
