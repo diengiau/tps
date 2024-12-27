@@ -4,6 +4,8 @@
 
 _This version: 2024/11/29_
 
+![Figure 1:  Line plots of TPS, economic policy uncertainty, and political risk](img/ts_plots_3indices.png)
+
 This is code appendix to construct and analyze the project. It required data from **data** folder. In the folder, we have these code files:
 
 ## Part 1: To construct data: using R programming
@@ -25,3 +27,8 @@ This is code appendix to construct and analyze the project. It required data fro
 -	**t_positive_vs_negativeTPS.do**: Positive versus negative TPS
 
 After running these codes, the results will be in **output** folder.
+
+## Data
+In the `data` folder, we provide final data of the study:
+- tps_ts.csv: Time series of the TPS average across firms. This data is created from **01_construct_tps_panel.qmd**
+- tps_evtstudy_2016.dta: The event-study cross-sectional data for the 2016 Trump election. This data is created using file **t3_main.do**
