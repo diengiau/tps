@@ -1,6 +1,6 @@
 # Trade Policy Sensitivity (TPS)
 
-**Code Appendix** for _“Trade Policy Uncertainty and Global Stock Returns: Evidence from the 2016 US Presidential Election”_
+**Code & Data Appendix** for _“Trade Policy Uncertainty and Global Stock Returns: Evidence from the 2016 US Presidential Election”_
 
 _This version: 2024/11/29_
 
@@ -29,6 +29,6 @@ This is code appendix to construct and analyze the project. It required data fro
 After running these codes, the results will be in **output** folder.
 
 ## Data
-In the `data` folder, we provide final data of the study:
+In the `data` folder, we also provide final data of the study:
 - tps_ts.csv: Time series of the TPS average across firms. This data is created from **01_construct_tps_panel.qmd**
 - tps_evtstudy_2016.dta: The event-study cross-sectional data for the 2016 Trump election. This data is created using file **t3_main.do**
